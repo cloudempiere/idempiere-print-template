@@ -1,0 +1,28 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: iDempiere Print Template Engine (FreeMarker)
+Bundle-SymbolicName: org.idempiere.print.freemarker;singleton:=true
+Bundle-Version: 12.0.0.qualifier
+Bundle-Vendor: DevCoffee / Riskora
+Bundle-RequiredExecutionEnvironment: JavaSE-17
+Bundle-Activator: org.adempiere.plugin.utils.Incremental2PackActivator
+Bundle-ActivationPolicy: lazy
+Bundle-ClassPath: .,
+ lib/freemarker.jar,
+ lib/openhtmltopdf-core.jar,
+ lib/openhtmltopdf-pdfbox.jar,
+ lib/pdfbox.jar,
+ lib/fontbox.jar,
+ lib/xmpbox.jar,
+ lib/graphics2d.jar,
+ lib/jsoup.jar
+Require-Bundle: org.adempiere.base;bundle-version="12.0.0",
+ org.adempiere.plugin.utils;bundle-version="12.0.0"
+Service-Component: OSGI-INF/*.xml
+Import-Package: com.google.gson;resolution:=optional,
+ org.apache.commons.logging,
+ org.osgi.service.event
+Export-Package: org.idempiere.print.template,
+ org.idempiere.print.template.model,
+ org.idempiere.print.freemarker
+Automatic-Module-Name: org.idempiere.print.freemarker

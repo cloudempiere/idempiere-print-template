@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+   <extension
+         id="org.idempiere.print.template.JsonGridTabExporter"
+         name="Grid data JSON exporter"
+         point="org.adempiere.base.IGridTabExporter">
+      <exporter
+            class="org.idempiere.print.template.JsonGridTabExporter"
+            priority="0">
+      </exporter>
+   </extension>
+</plugin>

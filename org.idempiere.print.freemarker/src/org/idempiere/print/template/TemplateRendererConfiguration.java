@@ -1,0 +1,91 @@
+/**********************************************************************
+* This file is part of the iDempiere Print Template Engine plugin.    *
+*                                                                     *
+* This program is free software; you can redistribute it and/or       *
+* modify it under the terms of the GNU General Public License         *
+* as published by the Free Software Foundation; either version 2      *
+* of the License, or (at your option) any later version.              *
+*                                                                     *
+* This program is distributed in the hope that it will be useful,     *
+* but WITHOUT ANY WARRANTY; without even the implied warranty of      *
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the        *
+* GNU General Public License for more details.                        *
+**********************************************************************/
+package org.idempiere.print.template;
+
+import java.io.File;
+import java.io.OutputStream;
+import java.io.Writer;
+
+import org.compiere.model.PO;
+import org.idempiere.print.renderer.IReportRendererConfiguration;
+import org.idempiere.print.template.model.MPrintTemplate;
+
+/**
+ * Configuração base dos renderers template-based. Todo engine
+ * (FreeMarker, Velocity, ...) declara uma subclasse com construtor
+ * (MPrintTemplate, PO) — é esse contrato que o
+ * {@link TemplateRenderDispatcher} instancia por reflexão.
+ */
+public class TemplateRendererConfiguration implements IReportRendererConfiguration {
+
+	private final MPrintTemplate template;
+	private final PO targetPO;
+	private File outputFile;
+	private OutputStream outputStream;
+	private Writer outputWriter;
+	private String outputFormat;
+
+	public TemplateRendererConfiguration(MPrintTemplate template, PO targetPO) {
+		this.template = template;
+		this.targetPO = targetPO;
+	}
+
+	public MPrintTemplate getTemplate() {
+		return template;
+	}
+
+	public PO getPO() {
+		return targetPO;
+	}
+
+	/** Extensão efetiva da saída ("pdf"/"html"); null = default do template */
+	public String getOutputFormat() {
+		return outputFormat;
+	}
+
+	public TemplateRendererConfiguration outputFormat(String format) {
+		this.outputFormat = format;
+		return this;
+	}
+
+	public TemplateRendererConfiguration outputFile(File file) {
+		this.outputFile = file;
+		return this;
+	}
+
+	public TemplateRendererConfiguration outputStream(OutputStream stream) {
+		this.outputStream = stream;
+		return this;
+	}
+
+	public TemplateRendererConfiguration outputWriter(Writer writer) {
+		this.outputWriter = writer;
+		return this;
+	}
+
+	@Override
+	public File getOutputFile() {
+		return outputFile;
+	}
+
+	@Override
+	public OutputStream getOutputStream() {
+		return outputStream;
+	}
+
+	@Override
+	public Writer getOutputWriter() {
+		return outputWriter;
+	}
+}

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?><?xml-stylesheet type="text/css" href="idempiereDocument.css"?><idempiereDocument>
+    <header>org.idempiere.print.freemarker Package Description</header>
+    <H1>Package Name:</H1>
+    <packagename>org.idempiere.print.freemarker</packagename>
+    <H1>Author:</H1>
+    <Name:>Murilo Habermann Torquato</Name:>
+    <H1>Email Address:</H1>
+    <Email/>
+    <H1>Created:</H1>
+    <Date>2026-07-15 09:15:14.848524</Date>
+    <H1>Updated:</H1>
+    <Date>2026-07-15 09:15:14.848524</Date>
+    <H1>Description:</H1>
+    <description>Print Template Engine — dicionário (EntityType PRT): AD_PrintTemplate(+Include), Ref List TemplateEngineType, janela, menu, processo ponte, coluna+DisplayLogic no AD_PrintFormat via SQL</description>
+    <H1>Instructions:</H1>
+    <instructions>Instalado automaticamente pelo Incremental2PackActivator do bundle org.idempiere.print.freemarker (META-INF/2Pack_1.0.0.zip)</instructions>
+    <H1>Files in Package:</H1>
+    <file>File: PackOut.xml</file>
+    <filedirectory>Directory: \dict\</filedirectory>
+    <filenotes>Notes: Contains all application/object settings for package</filenotes>
+    <H1>Client:</H1>
+    <Client>0-SYSTEM-System</Client>
+</idempiereDocument>
