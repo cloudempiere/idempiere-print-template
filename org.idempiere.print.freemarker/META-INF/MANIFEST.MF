@@ -2,7 +2,7 @@ Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: iDempiere Print Template Engine (FreeMarker)
 Bundle-SymbolicName: org.idempiere.print.freemarker;singleton:=true
-Bundle-Version: 12.0.0.qualifier
+Bundle-Version: 13.0.0.qualifier
 Bundle-Vendor: DevCoffee / Riskora
 Bundle-RequiredExecutionEnvironment: JavaSE-17
 Bundle-Activator: org.adempiere.plugin.utils.Incremental2PackActivator
@@ -16,8 +16,8 @@ Bundle-ClassPath: .,
  lib/xmpbox.jar,
  lib/graphics2d.jar,
  lib/jsoup.jar
-Require-Bundle: org.adempiere.base;bundle-version="12.0.0",
- org.adempiere.plugin.utils;bundle-version="12.0.0"
+Require-Bundle: org.adempiere.base;bundle-version="13.0.0",
+ org.adempiere.plugin.utils;bundle-version="13.0.0"
 Service-Component: OSGI-INF/*.xml
 Import-Package: com.google.gson;resolution:=optional,
  org.apache.commons.logging,

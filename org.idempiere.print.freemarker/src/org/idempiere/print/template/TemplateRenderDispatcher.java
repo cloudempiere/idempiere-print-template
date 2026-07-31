@@ -26,9 +26,8 @@ import org.idempiere.print.template.model.MPrintTemplate;
 /**
  * Resolve o {@link IReportRenderer} cujo getId() casa com o
  * TemplateEngineType do template (lookup OSGi via Core) e dispara a
- * renderização. O ReportEngine é passado null — no fluxo da ponte não
- * existe um (o desvio acontece antes do LayoutEngine); renderers
- * template-based consomem só a configuração.
+ * renderização. Renderers template-based consomem só a configuração;
+ * por isso não precisam do ReportEngine da API de conteúdo.
  *
  * Spec: riskora/docs/SPEC_IDEMPIERE_PRINT_TEMPLATE_ENGINE.md §7.3
  */

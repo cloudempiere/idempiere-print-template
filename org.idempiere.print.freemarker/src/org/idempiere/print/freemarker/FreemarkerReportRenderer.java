@@ -39,7 +39,7 @@ import freemarker.template.Template;
 
 /**
  * Renderer FreeMarker (TemplateEngineType 'FM'). Consome só a
- * configuração — o ReportEngine chega null no fluxo da ponte (§7.3).
+ * configuração — o ReportEngine não é necessário neste renderer.
  *
  * Data model: colunas do PO (FK como {id, display}) + coleções dos
  * includes + namespace {@code ctx} (client/org/user/idioma/now) +

@@ -115,14 +115,14 @@ BEGIN
         'Trl do field novo (backfill nos idiomas de sistema)', v_sql, 'Postgres', generate_uuid());
 
     -- SQL 120: DisplayLogic dos fields da tab 425 — APPEND (preserva gates pré-existentes)
-    v_sql := $S$UPDATE AD_Field f SET DisplayLogic = COALESCE(f.DisplayLogic || ' & ', '') || '@AD_PrintTemplate_ID@=0', Updated=NOW(), UpdatedBy=100 FROM AD_Column c WHERE c.AD_Column_ID=f.AD_Column_ID AND f.AD_Tab_ID=425 AND c.ColumnName IN ('HeaderMargin','FooterMargin','IsStandardHeaderFooter','AD_PrintColor_ID','AD_PrintFont_ID','AD_PrintPaper_ID','IsTableBased','IsBreakPagePerRecord','JasperProcess_ID') AND (f.DisplayLogic IS NULL OR f.DisplayLogic NOT LIKE '%AD_PrintTemplate_ID%')$S$;
+    v_sql := $S$UPDATE AD_Field f SET DisplayLogic = COALESCE(f.DisplayLogic || ' & ', '') || chr(64) || 'AD_PrintTemplate_ID' || chr(64) || '=0', Updated=NOW(), UpdatedBy=100 FROM AD_Column c WHERE c.AD_Column_ID=f.AD_Column_ID AND f.AD_Tab_ID=425 AND c.ColumnName IN ('HeaderMargin','FooterMargin','IsStandardHeaderFooter','AD_PrintColor_ID','AD_PrintFont_ID','AD_PrintPaper_ID','IsTableBased','IsBreakPagePerRecord','JasperProcess_ID') AND (f.DisplayLogic IS NULL OR f.DisplayLogic NOT LIKE '%AD_PrintTemplate_ID%')$S$;
     INSERT INTO AD_Package_Exp_Detail (AD_Package_Exp_Detail_ID, AD_Package_Exp_ID, AD_Client_ID, AD_Org_ID,
         IsActive, Processing, Created, CreatedBy, Updated, UpdatedBy, Line, Type, Description, SQLStatement, DBType, AD_Package_Exp_Detail_UU)
     VALUES (nextidfunc(seq_det,'N'), v_exp, 0, 0, 'Y', 'N', NOW(), 100, NOW(), 100, 120, 'SQL',
         'DisplayLogic append nos fields da tab 425 (oculta config irrelevante quando template setado)', v_sql, 'Postgres', generate_uuid());
 
     -- SQL 130: DisplayLogic das tabs de AD_PrintFormatItem — APPEND
-    v_sql := $S$UPDATE AD_Tab SET DisplayLogic = COALESCE(DisplayLogic || ' & ', '') || '@AD_PrintTemplate_ID@=0', Updated=NOW(), UpdatedBy=100 WHERE AD_Window_ID=240 AND AD_Table_ID=489 AND (DisplayLogic IS NULL OR DisplayLogic NOT LIKE '%AD_PrintTemplate_ID%')$S$;
+    v_sql := $S$UPDATE AD_Tab SET DisplayLogic = COALESCE(DisplayLogic || ' & ', '') || chr(64) || 'AD_PrintTemplate_ID' || chr(64) || '=0', Updated=NOW(), UpdatedBy=100 WHERE AD_Window_ID=240 AND AD_Table_ID=489 AND (DisplayLogic IS NULL OR DisplayLogic NOT LIKE '%AD_PrintTemplate_ID%')$S$;
     INSERT INTO AD_Package_Exp_Detail (AD_Package_Exp_Detail_ID, AD_Package_Exp_ID, AD_Client_ID, AD_Org_ID,
         IsActive, Processing, Created, CreatedBy, Updated, UpdatedBy, Line, Type, Description, SQLStatement, DBType, AD_Package_Exp_Detail_UU)
     VALUES (nextidfunc(seq_det,'N'), v_exp, 0, 0, 'Y', 'N', NOW(), 100, NOW(), 100, 130, 'SQL',

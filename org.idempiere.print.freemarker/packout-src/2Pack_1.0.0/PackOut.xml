@@ -4842,10 +4842,10 @@
     </SQLStatement>
     <SQLStatement type="custom">
         <DBType>Postgres</DBType>
-        <statement><![CDATA[UPDATE AD_Field f SET DisplayLogic = COALESCE(f.DisplayLogic || ' & ', '') || '@AD_PrintTemplate_ID@=0', Updated=NOW(), UpdatedBy=100 FROM AD_Column c WHERE c.AD_Column_ID=f.AD_Column_ID AND f.AD_Tab_ID=425 AND c.ColumnName IN ('HeaderMargin','FooterMargin','IsStandardHeaderFooter','AD_PrintColor_ID','AD_PrintFont_ID','AD_PrintPaper_ID','IsTableBased','IsBreakPagePerRecord','JasperProcess_ID') AND (f.DisplayLogic IS NULL OR f.DisplayLogic NOT LIKE '%AD_PrintTemplate_ID%')]]></statement>
+        <statement><![CDATA[UPDATE AD_Field f SET DisplayLogic = COALESCE(f.DisplayLogic || ' & ', '') || chr(64) || 'AD_PrintTemplate_ID' || chr(64) || '=0', Updated=NOW(), UpdatedBy=100 FROM AD_Column c WHERE c.AD_Column_ID=f.AD_Column_ID AND f.AD_Tab_ID=425 AND c.ColumnName IN ('HeaderMargin','FooterMargin','IsStandardHeaderFooter','AD_PrintColor_ID','AD_PrintFont_ID','AD_PrintPaper_ID','IsTableBased','IsBreakPagePerRecord','JasperProcess_ID') AND (f.DisplayLogic IS NULL OR f.DisplayLogic NOT LIKE '%AD_PrintTemplate_ID%')]]></statement>
     </SQLStatement>
     <SQLStatement type="custom">
         <DBType>Postgres</DBType>
-        <statement><![CDATA[UPDATE AD_Tab SET DisplayLogic = COALESCE(DisplayLogic || ' & ', '') || '@AD_PrintTemplate_ID@=0', Updated=NOW(), UpdatedBy=100 WHERE AD_Window_ID=240 AND AD_Table_ID=489 AND (DisplayLogic IS NULL OR DisplayLogic NOT LIKE '%AD_PrintTemplate_ID%')]]></statement>
+        <statement><![CDATA[UPDATE AD_Tab SET DisplayLogic = COALESCE(DisplayLogic || ' & ', '') || chr(64) || 'AD_PrintTemplate_ID' || chr(64) || '=0', Updated=NOW(), UpdatedBy=100 WHERE AD_Window_ID=240 AND AD_Table_ID=489 AND (DisplayLogic IS NULL OR DisplayLogic NOT LIKE '%AD_PrintTemplate_ID%')]]></statement>
     </SQLStatement>
 </idempiere>

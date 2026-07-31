@@ -2,6 +2,7 @@
 <classpath>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-17"/>
 	<classpathentry kind="con" path="org.eclipse.pde.core.requiredPlugins"/>
+	<classpathentry kind="src" path="src/"/>
 	<classpathentry exported="true" kind="lib" path="lib/freemarker.jar"/>
 	<classpathentry exported="true" kind="lib" path="lib/openhtmltopdf-core.jar"/>
 	<classpathentry exported="true" kind="lib" path="lib/openhtmltopdf-pdfbox.jar"/>
@@ -10,6 +11,5 @@
 	<classpathentry exported="true" kind="lib" path="lib/xmpbox.jar"/>
 	<classpathentry exported="true" kind="lib" path="lib/graphics2d.jar"/>
 	<classpathentry exported="true" kind="lib" path="lib/jsoup.jar"/>
-	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

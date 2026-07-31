@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<idempiere Name="org.idempiere.print.freemarker" Version="1.0.1" idempiereVersion="13.0.0" DataBaseVersion="13" Description="IDEMPIERE-7070 compatibility: install Print Template display logic without PackIn context substitution" Author="DevCoffee / Riskora" AuthorEmail="" CreatedDate="2026-07-31 23:20:00" UpdatedDate="2026-07-31 23:20:00" PackOutVersion="100" UpdateDictionary="false" Client="0-SYSTEM-System" AD_Client_UU="11237b53-9592-4af1-b3c5-afd216514b5d">
+    <SQLStatement type="custom">
+        <DBType>Postgres</DBType>
+        <statement><![CDATA[UPDATE AD_Field f SET DisplayLogic = COALESCE(f.DisplayLogic || ' & ', '') || chr(64) || 'AD_PrintTemplate_ID' || chr(64) || '=0', Updated=NOW(), UpdatedBy=100 FROM AD_Column c WHERE c.AD_Column_ID=f.AD_Column_ID AND f.AD_Tab_ID=425 AND c.ColumnName IN ('HeaderMargin','FooterMargin','IsStandardHeaderFooter','AD_PrintColor_ID','AD_PrintFont_ID','AD_PrintPaper_ID','IsTableBased','IsBreakPagePerRecord','JasperProcess_ID') AND (f.DisplayLogic IS NULL OR f.DisplayLogic NOT LIKE '%AD_PrintTemplate_ID%')]]></statement>
+    </SQLStatement>
+    <SQLStatement type="custom">
+        <DBType>Postgres</DBType>
+        <statement><![CDATA[UPDATE AD_Tab SET DisplayLogic = COALESCE(DisplayLogic || ' & ', '') || chr(64) || 'AD_PrintTemplate_ID' || chr(64) || '=0', Updated=NOW(), UpdatedBy=100 WHERE AD_Window_ID=240 AND AD_Table_ID=489 AND (DisplayLogic IS NULL OR DisplayLogic NOT LIKE '%AD_PrintTemplate_ID%')]]></statement>
+    </SQLStatement>
+</idempiere>
