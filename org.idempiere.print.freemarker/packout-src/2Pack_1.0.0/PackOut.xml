@@ -166,8 +166,6 @@
         <ExecutionType/>
         <AllowMultipleExecution>P</AllowMultipleExecution>
         <FileNamePattern/>
-        <BXS_MBDashboard_ID reference="id"/>
-        <BXS_MBIsOpenNewTab>N</BXS_MBIsOpenNewTab>
         <AD_Process_Trl type="translation">
             <Description>Valida a sintaxe do template e gera prévia com um registro de amostra</Description>
             <Help/>
@@ -4747,8 +4745,6 @@
         <ExecutionType/>
         <AllowMultipleExecution>P</AllowMultipleExecution>
         <FileNamePattern/>
-        <BXS_MBDashboard_ID reference="id"/>
-        <BXS_MBIsOpenNewTab>N</BXS_MBIsOpenNewTab>
         <AD_Process_Trl type="translation">
             <Description>Ponte do Print Template Engine — executado via JasperProcess_ID do print format</Description>
             <Help/>
