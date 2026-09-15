@@ -14,8 +14,8 @@ into iDempiere's print format engine — HTML/PDF output driven by
 - Bonus: JSON export of any record in the native Export dialog
   (`IGridTabExporter`).
 
-> ⚠️ **Early development.** Works end-to-end on iDempiere 13, but not
+> ⚠️ **Early development.** Works end-to-end on iDempiere 14, but not
 > production-ready — APIs and dictionary may change.
 
-Requires iDempiere 13 / Java 17. Import `org.idempiere.print.freemarker`
+Requires iDempiere 14 / Java 17. Import `org.idempiere.print.freemarker`
 as an Eclipse PDE project. License: GPL-2.0.

@@ -24,8 +24,6 @@ public class PrintTemplateProcessFactory implements IProcessFactory {
 
 	@Override
 	public ProcessCall newProcessInstance(String className) {
-		if (TemplateReportStarter.class.getName().equals(className))
-			return new TemplateReportStarter();
 		if (TemplateValidateProcess.class.getName().equals(className))
 			return new TemplateValidateProcess();
 		return null;
