@@ -18,11 +18,15 @@ import java.util.List;
 import org.adempiere.exceptions.AdempiereException;
 import org.apache.pdfbox.io.MemoryUsageSetting;
 import org.apache.pdfbox.multipdf.PDFMergerUtility;
+import org.compiere.model.MQuery;
 import org.compiere.model.MTable;
 import org.compiere.model.PO;
 import org.compiere.model.PrintInfo;
+import org.compiere.model.Query;
 import org.compiere.print.MPrintFormat;
+import org.compiere.print.ReportEngine;
 import org.compiere.process.ProcessInfo;
+import org.compiere.util.CLogger;
 import org.idempiere.print.IReportContentRenderer;
 import org.idempiere.print.IReportContentRendererFactory;
 import org.idempiere.print.ReportContentRequest;
@@ -34,6 +38,10 @@ import org.jsoup.nodes.Document;
 
 /** Integrates print templates with the report-content API from IDEMPIERE-7070. */
 public class PrintTemplateContentRendererFactory implements IReportContentRendererFactory {
+
+	private static final CLogger log = CLogger.getCLogger(PrintTemplateContentRendererFactory.class);
+	/** Cap defensivo quando a impressão "de todos" cai num escopo grande */
+	private static final int MAX_BATCH_ROWS = 1000;
 
 	@Override
 	public IReportContentRenderer createRenderer(ReportContentRequest request) {
@@ -49,26 +57,51 @@ public class PrintTemplateContentRendererFactory implements IReportContentRender
 		MPrintTemplate template = MPrintTemplate.get(printFormat.getCtx(), templateId);
 		if (template == null || !template.isActive())
 			throw new AdempiereException("Print Template: template " + templateId + " does not exist or is inactive");
-		return new PrintTemplateContentRenderer(template, resolveTargetPOs(request, template));
+		List<PO> targets = resolveTargetPOs(request, template);
+		if (targets.isEmpty())
+			return null; // sem contexto de registro (ex.: report avulso, Record_ID=0) → declina; o core segue no fluxo normal
+		// IsForm='Y' → documento (1 render por registro + merge); IsForm='N' → listagem (1 render, rows = todos)
+		boolean listMode = !printFormat.isForm();
+		return new PrintTemplateContentRenderer(template, targets, listMode);
 	}
 
 	private static final class PrintTemplateContentRenderer implements IReportContentRenderer {
-		private static final ReportContentType[] CONTENT_TYPES = {
+		/** Modo documento: só renderiza o template como PDF/HTML */
+		private static final ReportContentType[] DOC_CONTENT_TYPES = {
 				new ReportContentType("PDF", "pdf", "application/pdf"),
 				new ReportContentType("HTML", "html", "text/html; charset=utf-8") };
+		/** Modo listagem: além de PDF/HTML, exporta a grade pra CSV/XLSX (via TabularExporter) */
+		private static final ReportContentType[] LIST_CONTENT_TYPES = {
+				new ReportContentType("PDF", "pdf", "application/pdf"),
+				new ReportContentType("HTML", "html", "text/html; charset=utf-8"),
+				new ReportContentType("CSV", "csv", "text/csv; charset=utf-8"),
+				new ReportContentType("XLSX", "xlsx",
+						"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") };
 
 		private final MPrintTemplate template;
 		private final List<PO> targets;
+		/** IsForm='N': um único render com todos os registros (rows); false = 1 doc por registro + merge */
+		private final boolean listMode;
 
-		private PrintTemplateContentRenderer(MPrintTemplate template, List<PO> targets) {
+		private PrintTemplateContentRenderer(MPrintTemplate template, List<PO> targets, boolean listMode) {
 			this.template = template;
 			this.targets = targets;
+			this.listMode = listMode;
 		}
 
 		@Override
 		public File getContent(String contentType, String fileExtension) {
 			String extension = normalizeExtension(contentType, fileExtension);
 			try {
+				if (listMode) {
+					if ("csv".equals(extension) || "xlsx".equals(extension))
+						return exportTabular(extension);
+					File output = Files.createTempFile("print-template-list-", "." + extension).toFile();
+					if (!TemplateRenderDispatcher.renderList(template, targets, output, extension))
+						throw new AdempiereException("Print Template: no renderer installed for engine '"
+								+ template.getTemplateEngineType() + "'");
+					return output;
+				}
 				List<File> rendered = new ArrayList<>();
 				for (PO target : targets) {
 					File output = Files.createTempFile("print-template-" + target.get_ID() + "-", "." + extension).toFile();
@@ -94,12 +127,32 @@ public class PrintTemplateContentRendererFactory implements IReportContentRender
 
 		@Override
 		public ReportContentType[] getSupportedContentTypes() {
-			return CONTENT_TYPES.clone();
+			return (listMode ? LIST_CONTENT_TYPES : DOC_CONTENT_TYPES).clone();
 		}
 
 		@Override
 		public int getRowCount() {
 			return targets.size();
+		}
+
+		/** Renderiza a listagem como HTML, extrai o {@code <table>} e reescreve em CSV/XLSX */
+		private File exportTabular(String extension) throws Exception {
+			File html = Files.createTempFile("print-template-list-", ".html").toFile();
+			try {
+				if (!TemplateRenderDispatcher.renderList(template, targets, html, "html"))
+					throw new AdempiereException("Print Template: no renderer installed for engine '"
+							+ template.getTemplateEngineType() + "'");
+				List<List<String>> table = TabularExporter.extractTable(
+						Files.readString(html.toPath(), StandardCharsets.UTF_8));
+				File output = Files.createTempFile("print-template-list-", "." + extension).toFile();
+				if ("csv".equals(extension))
+					TabularExporter.writeCsv(table, output);
+				else
+					TabularExporter.writeXlsx(table, output);
+				return output;
+			} finally {
+				Files.deleteIfExists(html.toPath());
+			}
 		}
 
 		private File merge(List<File> rendered, String extension) throws Exception {
@@ -131,6 +184,12 @@ public class PrintTemplateContentRendererFactory implements IReportContentRender
 		if ("html".equalsIgnoreCase(fileExtension)
 				|| (contentType != null && contentType.toLowerCase().startsWith("text/html")))
 			return "html";
+		if ("csv".equalsIgnoreCase(fileExtension)
+				|| (contentType != null && contentType.toLowerCase().startsWith("text/csv")))
+			return "csv";
+		if ("xlsx".equalsIgnoreCase(fileExtension)
+				|| (contentType != null && contentType.toLowerCase().contains("spreadsheetml.sheet")))
+			return "xlsx";
 		throw new AdempiereException("Print Template: unsupported output type " + contentType + " (" + fileExtension + ")");
 	}
 
@@ -161,19 +220,42 @@ public class PrintTemplateContentRendererFactory implements IReportContentRender
 			recordIds.add(recordId);
 		recordIds = new ArrayList<>(new LinkedHashSet<>(recordIds));
 
-		if (tableId <= 0 || recordIds.isEmpty())
-			throw new AdempiereException("Print Template: report has no record context"
-					+ " (AD_Table_ID=" + tableId + ", Record_ID=" + recordId + ")");
-		List<PO> targets = new ArrayList<>();
+		if (tableId <= 0)
+			return new ArrayList<>(); // sem tabela → declina (createRenderer devolve null, o core segue normal)
+		if (template.getAD_Table_ID() > 0 && template.getAD_Table_ID() != tableId)
+			return new ArrayList<>(); // template é de outra tabela → declina
+
 		MTable table = MTable.get(template.getCtx(), tableId);
-		for (int id : recordIds) {
-			PO target = table.getPO(id, null);
-			if (target == null)
-				throw new AdempiereException("Print Template: record " + id + " not found in table " + tableId);
-			if (template.getAD_Table_ID() > 0 && template.getAD_Table_ID() != target.get_Table_ID())
-				throw new AdempiereException("Print Template: template '" + template.getName()
-						+ "' does not apply to table " + target.get_TableName());
-			targets.add(target);
+		List<PO> targets = new ArrayList<>();
+
+		if (!recordIds.isEmpty()) {
+			// "current row" (Record_ID) e/ou multi-seleção do grid (ProcessInfo.Record_IDs)
+			for (int id : recordIds) {
+				PO po = table.getPO(id, null);
+				if (po != null)
+					targets.add(po);
+			}
+			return targets;
+		}
+
+		// Sem registro específico: imprime "todos" — o escopo do report (query do ReportEngine),
+		// em vez de erro. Cada registro é renderizado e os PDFs/HTMLs são unidos (merge no getContent).
+		ReportEngine re = request.reportEngine();
+		MQuery mq = (re != null) ? re.getQuery() : null;
+		String where = (mq != null && mq.getRestrictionCount() > 0) ? mq.getWhereClause(false) : null;
+		try {
+			List<PO> rows = new Query(template.getCtx(), table.getTableName(), where, null)
+					.setOnlyActiveRecords(true)
+					.list();
+			if (rows.size() > MAX_BATCH_ROWS) {
+				log.warning("Print Template: escopo com " + rows.size() + " registros — truncado em " + MAX_BATCH_ROWS
+						+ " (filtre a aba/report antes de imprimir todos)");
+				rows = new ArrayList<>(rows.subList(0, MAX_BATCH_ROWS));
+			}
+			targets.addAll(rows);
+		} catch (Exception e) {
+			log.warning("Print Template: não resolvi o escopo do report (" + e.getMessage() + ") — declinando");
+			return new ArrayList<>();
 		}
 		return targets;
 	}

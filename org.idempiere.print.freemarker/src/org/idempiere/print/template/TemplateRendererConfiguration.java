@@ -16,6 +16,7 @@ package org.idempiere.print.template;
 import java.io.File;
 import java.io.OutputStream;
 import java.io.Writer;
+import java.util.List;
 
 import org.compiere.model.PO;
 import org.idempiere.print.renderer.IReportRendererConfiguration;
@@ -31,6 +32,8 @@ public class TemplateRendererConfiguration implements IReportRendererConfigurati
 
 	private final MPrintTemplate template;
 	private final PO targetPO;
+	/** Modo listagem (IsForm='N'): todos os registros num único render; null/vazio = modo documento */
+	private List<PO> targetPOs;
 	private File outputFile;
 	private OutputStream outputStream;
 	private Writer outputWriter;
@@ -47,6 +50,16 @@ public class TemplateRendererConfiguration implements IReportRendererConfigurati
 
 	public PO getPO() {
 		return targetPO;
+	}
+
+	/** Registros do modo listagem (IsForm='N'); null/vazio ⇒ modo documento (só getPO()) */
+	public List<PO> getPOs() {
+		return targetPOs;
+	}
+
+	public TemplateRendererConfiguration targetPOs(List<PO> targetPOs) {
+		this.targetPOs = targetPOs;
+		return this;
 	}
 
 	/** Extensão efetiva da saída ("pdf"/"html"); null = default do template */

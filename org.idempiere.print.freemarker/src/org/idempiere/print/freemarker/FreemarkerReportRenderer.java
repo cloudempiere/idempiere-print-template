@@ -19,7 +19,9 @@ import java.io.OutputStreamWriter;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
@@ -81,11 +83,25 @@ public class FreemarkerReportRenderer implements IReportRenderer<FreemarkerRepor
 	public void renderReport(ReportEngine reportEngine, FreemarkerReportRendererConfiguration config) {
 		MPrintTemplate printTemplate = config.getTemplate();
 		PO targetPO = config.getPO();
+		List<PO> listPOs = config.getPOs();
 		try {
 			Template template = new Template(printTemplate.getName(),
 					printTemplate.getTemplateBody(), FreemarkerConfigurationFactory.get());
 
-			Map<String, Object> dataModel = PO2MapBuilder.build(targetPO, printTemplate.getIncludes());
+			Map<String, Object> dataModel;
+			if (listPOs != null && !listPOs.isEmpty()) {
+				// Modo listagem (IsForm='N'): todos os registros em rows; o
+				// template itera (<#list rows as r>) e agrega (rows?map(..)?sum)
+				List<Map<String, Object>> rows = new ArrayList<>();
+				for (PO po : listPOs)
+					rows.add(PO2MapBuilder.build(po, printTemplate.getIncludes()));
+				dataModel = new LinkedHashMap<>();
+				dataModel.put("rows", rows);
+				dataModel.put("count", rows.size());
+			} else {
+				// Modo documento (IsForm='Y'): colunas do PO no topo
+				dataModel = PO2MapBuilder.build(targetPO, printTemplate.getIncludes());
+			}
 			dataModel.put("ctx", contextMap(targetPO.getCtx()));
 			dataModel.put("assets", AssetResolver.asBase64(printTemplate));
 

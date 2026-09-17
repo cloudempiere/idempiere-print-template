@@ -14,6 +14,7 @@
 package org.idempiere.print.template;
 
 import java.io.File;
+import java.util.List;
 
 import org.adempiere.base.Core;
 import org.adempiere.exceptions.AdempiereException;
@@ -68,30 +69,59 @@ public class TemplateRenderDispatcher {
 	 */
 	public static boolean render(MPrintTemplate template, PO targetPO, File outputFile, String outputFormat) {
 		String engineType = template.getTemplateEngineType();
-		IReportRenderer<IReportRendererConfiguration> renderer = Core.getReportRenderer(engineType);
-		if (renderer == null) {
-			log.warning("Nenhum IReportRenderer registrado pra TemplateEngineType=" + engineType);
+		IReportRenderer<IReportRendererConfiguration> renderer = getRenderer(engineType);
+		if (renderer == null)
 			return false;
-		}
+		TemplateRendererConfiguration config = newConfig(renderer, engineType, template, targetPO);
+		config.outputFile(outputFile);
+		config.outputFormat(outputFormat);
+		renderer.renderReport(null, config);
+		return true;
+	}
 
+	/**
+	 * Modo listagem (IsForm='N'): um único render com TODOS os registros
+	 * expostos ao template como a coleção {@code rows} (o autor itera,
+	 * soma e agrupa). O PO representativo (primeiro) alimenta o ctx.
+	 *
+	 * @return false quando não há renderer registrado ou a lista é vazia
+	 */
+	public static boolean renderList(MPrintTemplate template, List<PO> targetPOs, File outputFile, String outputFormat) {
+		if (targetPOs == null || targetPOs.isEmpty())
+			return false;
+		String engineType = template.getTemplateEngineType();
+		IReportRenderer<IReportRendererConfiguration> renderer = getRenderer(engineType);
+		if (renderer == null)
+			return false;
+		TemplateRendererConfiguration config = newConfig(renderer, engineType, template, targetPOs.get(0));
+		config.targetPOs(targetPOs);
+		config.outputFile(outputFile);
+		config.outputFormat(outputFormat);
+		renderer.renderReport(null, config);
+		return true;
+	}
+
+	private static IReportRenderer<IReportRendererConfiguration> getRenderer(String engineType) {
+		IReportRenderer<IReportRendererConfiguration> renderer = Core.getReportRenderer(engineType);
+		if (renderer == null)
+			log.warning("Nenhum IReportRenderer registrado pra TemplateEngineType=" + engineType);
+		return renderer;
+	}
+
+	/** Instancia a config template-based pelo contrato (MPrintTemplate, PO) via reflexão */
+	private static TemplateRendererConfiguration newConfig(IReportRenderer<IReportRendererConfiguration> renderer,
+			String engineType, MPrintTemplate template, PO targetPO) {
 		Class<?> configType = renderer.getConfigurationType();
 		if (!TemplateRendererConfiguration.class.isAssignableFrom(configType))
 			throw new AdempiereException("Renderer '" + engineType + "' não é template-based (config "
 					+ configType.getName() + " não estende TemplateRendererConfiguration)");
-
-		TemplateRendererConfiguration config;
 		try {
-			config = (TemplateRendererConfiguration) configType
+			return (TemplateRendererConfiguration) configType
 					.getDeclaredConstructor(MPrintTemplate.class, PO.class)
 					.newInstance(template, targetPO);
 		} catch (ReflectiveOperationException e) {
 			throw new AdempiereException("Config do renderer '" + engineType
 					+ "' sem construtor (MPrintTemplate, PO)", e);
 		}
-		config.outputFile(outputFile);
-		config.outputFormat(outputFormat);
-
-		renderer.renderReport(null, config);
-		return true;
 	}
 }
