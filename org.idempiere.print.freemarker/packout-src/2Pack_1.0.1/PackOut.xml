@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?><idempiere Name="org.idempiere.print.freemarker" Version="1.0.1" idempiereVersion="" DataBaseVersion="12" Description="Print Template Engine — integração no AD_PrintFormat (coluna AD_PrintTemplate_ID + field + DisplayLogic) via SQL, em pack separado p/ evitar deadlock de sequence" Author="Murilo Habermann Torquato" AuthorEmail="" CreatedDate="2026-07-15 09:15:14.848524" UpdatedDate="2026-07-15 09:15:14.848524" PackOutVersion="100" UpdateDictionary="false" Client="0-SYSTEM-System" AD_Client_UU="11237b53-9592-4af1-b3c5-afd216514b5d">
+    <SQLStatement type="custom">
+        <DBType>Postgres</DBType>
+        <statement><![CDATA[ALTER TABLE AD_PrintFormat ADD COLUMN IF NOT EXISTS AD_PrintTemplate_ID NUMERIC(10) DEFAULT NULL]]></statement>
+    </SQLStatement>
+    <SQLStatement type="custom">
+        <DBType>Postgres</DBType>
+        <statement><![CDATA[INSERT INTO AD_Column (AD_Column_ID, AD_Client_ID, AD_Org_ID, IsActive, Created, CreatedBy, Updated, UpdatedBy, Name, ColumnName, AD_Table_ID, AD_Reference_ID, FieldLength, IsKey, IsParent, IsMandatory, IsTranslated, IsIdentifier, SeqNo, IsEncrypted, IsSelectionColumn, IsUpdateable, IsAlwaysUpdateable, Version, EntityType, AD_Column_UU, Description, AD_Element_ID) SELECT nextidfunc((SELECT AD_Sequence_ID::integer FROM AD_Sequence WHERE Name='AD_Column'),'N'), 0, 0, 'Y', NOW(), 100, NOW(), 100, 'Print Template', 'AD_PrintTemplate_ID', 493, 19, 22, 'N', 'N', 'N', 'N', 'N', 0, 'N', 'N', 'Y', 'N', 0, 'PRT', generate_uuid(), 'Renderiza este formato via template declarativo (a ponte JasperProcess_ID é setada automaticamente)', (SELECT AD_Element_ID FROM AD_Element WHERE UPPER(ColumnName)='AD_PRINTTEMPLATE_ID' ORDER BY AD_Element_ID LIMIT 1) WHERE NOT EXISTS (SELECT 1 FROM AD_Column WHERE AD_Table_ID=493 AND UPPER(ColumnName)='AD_PRINTTEMPLATE_ID')]]></statement>
+    </SQLStatement>
+    <SQLStatement type="custom">
+        <DBType>Postgres</DBType>
+        <statement><![CDATA[INSERT INTO AD_Field (AD_Field_ID, AD_Client_ID, AD_Org_ID, IsActive, Created, CreatedBy, Updated, UpdatedBy, Name, Description, AD_Tab_ID, AD_Column_ID, IsDisplayed, DisplayLength, SeqNo, IsSameLine, IsHeading, IsFieldOnly, IsReadOnly, IsEncrypted, EntityType, AD_Field_UU) SELECT nextidfunc((SELECT AD_Sequence_ID::integer FROM AD_Sequence WHERE Name='AD_Field'),'N'), 0, 0, 'Y', NOW(), 100, NOW(), 100, 'Print Template', 'Renderiza via template declarativo em vez do layout', 425, (SELECT AD_Column_ID FROM AD_Column WHERE AD_Table_ID=493 AND UPPER(ColumnName)='AD_PRINTTEMPLATE_ID'), 'Y', 22, 260, 'N', 'N', 'N', 'N', 'N', 'PRT', generate_uuid() WHERE NOT EXISTS (SELECT 1 FROM AD_Field f JOIN AD_Column c ON c.AD_Column_ID=f.AD_Column_ID WHERE f.AD_Tab_ID=425 AND UPPER(c.ColumnName)='AD_PRINTTEMPLATE_ID')]]></statement>
+    </SQLStatement>
+    <SQLStatement type="custom">
+        <DBType>Postgres</DBType>
+        <statement><![CDATA[INSERT INTO AD_Field_Trl (AD_Field_ID, AD_Language, AD_Client_ID, AD_Org_ID, IsActive, Created, CreatedBy, Updated, UpdatedBy, Name, Description, Help, IsTranslated, AD_Field_Trl_UU) SELECT f.AD_Field_ID, l.AD_Language, 0, 0, 'Y', NOW(), 100, NOW(), 100, f.Name, f.Description, f.Help, 'N', generate_uuid() FROM AD_Field f JOIN AD_Column c ON c.AD_Column_ID=f.AD_Column_ID CROSS JOIN AD_Language l WHERE f.AD_Tab_ID=425 AND UPPER(c.ColumnName)='AD_PRINTTEMPLATE_ID' AND l.IsSystemLanguage='Y' AND NOT EXISTS (SELECT 1 FROM AD_Field_Trl t WHERE t.AD_Field_ID=f.AD_Field_ID AND t.AD_Language=l.AD_Language)]]></statement>
+    </SQLStatement>
+    <SQLStatement type="custom">
+        <DBType>Postgres</DBType>
+        <statement><![CDATA[UPDATE AD_Field f SET DisplayLogic = COALESCE(f.DisplayLogic || ' & ', '') || chr(64) || 'AD_PrintTemplate_ID' || chr(64) || '=0', Updated=NOW(), UpdatedBy=100 FROM AD_Column c WHERE c.AD_Column_ID=f.AD_Column_ID AND f.AD_Tab_ID=425 AND c.ColumnName IN ('HeaderMargin','FooterMargin','IsStandardHeaderFooter','AD_PrintColor_ID','AD_PrintFont_ID','AD_PrintPaper_ID','IsTableBased','IsBreakPagePerRecord','JasperProcess_ID') AND (f.DisplayLogic IS NULL OR f.DisplayLogic NOT LIKE '%AD_PrintTemplate_ID%')]]></statement>
+    </SQLStatement>
+    <SQLStatement type="custom">
+        <DBType>Postgres</DBType>
+        <statement><![CDATA[UPDATE AD_Tab SET DisplayLogic = COALESCE(DisplayLogic || ' & ', '') || chr(64) || 'AD_PrintTemplate_ID' || chr(64) || '=0', Updated=NOW(), UpdatedBy=100 WHERE AD_Window_ID=240 AND AD_Table_ID=489 AND (DisplayLogic IS NULL OR DisplayLogic NOT LIKE '%AD_PrintTemplate_ID%')]]></statement>
+    </SQLStatement>
+</idempiere>
