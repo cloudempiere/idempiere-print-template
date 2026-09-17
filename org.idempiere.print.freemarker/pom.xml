@@ -2,19 +2,85 @@
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
-	<parent>
-		<groupId>org.idempiere</groupId>
-		<artifactId>org.idempiere.parent</artifactId>
-		<version>${revision}</version>
-		<relativePath>../../org.idempiere.parent/pom.xml</relativePath>
-	</parent>
+
+	<groupId>org.idempiere.print</groupId>
 	<artifactId>org.idempiere.print.freemarker</artifactId>
+	<version>14.0.0-SNAPSHOT</version>
 	<packaging>eclipse-plugin</packaging>
+	<name>iDempiere Print Template Engine (FreeMarker)</name>
+
+	<properties>
+		<tycho.version>4.0.8</tycho.version>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<!-- p2 repository of the locally-built iDempiere core (mvn verify on idempiere/) -->
+		<idempiere.core.repository.url>file:///${basedir}/../../idempiere/org.idempiere.p2/target/repository</idempiere.core.repository.url>
+	</properties>
+
+	<repositories>
+		<repository>
+			<id>idempiere-core</id>
+			<url>${idempiere.core.repository.url}</url>
+			<layout>p2</layout>
+		</repository>
+	</repositories>
+
 	<build>
 		<plugins>
+			<!-- enable the Tycho build extension -->
+			<plugin>
+				<groupId>org.eclipse.tycho</groupId>
+				<artifactId>tycho-maven-plugin</artifactId>
+				<version>${tycho.version}</version>
+				<extensions>true</extensions>
+			</plugin>
+
+			<!-- target platform: resolve against the iDempiere core p2 repository -->
+			<plugin>
+				<groupId>org.eclipse.tycho</groupId>
+				<artifactId>target-platform-configuration</artifactId>
+				<version>${tycho.version}</version>
+				<configuration>
+					<environments>
+						<environment>
+							<os>linux</os>
+							<ws>gtk</ws>
+							<arch>x86_64</arch>
+						</environment>
+						<environment>
+							<os>win32</os>
+							<ws>win32</ws>
+							<arch>x86_64</arch>
+						</environment>
+						<environment>
+							<os>macosx</os>
+							<ws>cocoa</ws>
+							<arch>x86_64</arch>
+						</environment>
+					</environments>
+					<dependency-resolution>
+						<extraRequirements>
+							<requirement>
+								<type>eclipse-plugin</type>
+								<id>org.eclipse.core.runtime</id>
+								<versionRange>0.0.0</versionRange>
+							</requirement>
+							<requirement>
+								<type>eclipse-plugin</type>
+								<id>org.eclipse.equinox.common</id>
+								<versionRange>0.0.0</versionRange>
+							</requirement>
+						</extraRequirements>
+					</dependency-resolution>
+					<executionEnvironmentDefault>JavaSE-17</executionEnvironmentDefault>
+					<executionEnvironment>JavaSE-17</executionEnvironment>
+				</configuration>
+			</plugin>
+
+			<!-- copy the embedded runtime libraries into lib/ (Bundle-ClassPath) -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-dependency-plugin</artifactId>
+				<version>3.1.1</version>
 				<executions>
 					<execution>
 						<id>copy-embedded-libraries</id>

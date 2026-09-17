@@ -16,13 +16,14 @@ Bundle-ClassPath: .,
  lib/xmpbox.jar,
  lib/graphics2d.jar,
  lib/jsoup.jar
-Require-Bundle: org.adempiere.base;bundle-version="13.0.0",
- org.adempiere.plugin.utils;bundle-version="13.0.0"
+Require-Bundle: org.adempiere.base;bundle-version="14.0.0",
+ org.adempiere.plugin.utils;bundle-version="14.0.0"
 Service-Component: OSGI-INF/*.xml
-Import-Package: com.google.gson;resolution:=optional,
+Import-Package: com.google.gson;version="[2.9.0,3.0.0)",
  org.apache.commons.logging,
  org.osgi.service.event
 Export-Package: org.idempiere.print.template,
  org.idempiere.print.template.model,
  org.idempiere.print.freemarker
 Automatic-Module-Name: org.idempiere.print.freemarker
+Eclipse-BundleShape: dir
