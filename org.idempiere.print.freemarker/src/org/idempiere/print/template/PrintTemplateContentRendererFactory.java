@@ -11,22 +11,30 @@ package org.idempiere.print.template;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 
 import org.adempiere.exceptions.AdempiereException;
 import org.apache.pdfbox.io.MemoryUsageSetting;
 import org.apache.pdfbox.multipdf.PDFMergerUtility;
 import org.compiere.model.MQuery;
+import org.compiere.model.MRole;
 import org.compiere.model.MTable;
 import org.compiere.model.PO;
+import org.compiere.model.POInfo;
 import org.compiere.model.PrintInfo;
 import org.compiere.model.Query;
 import org.compiere.print.MPrintFormat;
 import org.compiere.print.ReportEngine;
 import org.compiere.process.ProcessInfo;
 import org.compiere.util.CLogger;
+import org.compiere.util.DB;
+import org.compiere.util.Util;
 import org.idempiere.print.IReportContentRenderer;
 import org.idempiere.print.IReportContentRendererFactory;
 import org.idempiere.print.ReportContentRequest;
@@ -57,6 +65,21 @@ public class PrintTemplateContentRendererFactory implements IReportContentRender
 		MPrintTemplate template = MPrintTemplate.get(printFormat.getCtx(), templateId);
 		if (template == null || !template.isActive())
 			throw new AdempiereException("Print Template: template " + templateId + " does not exist or is inactive");
+
+		// Tabela/view KEYLESS (ex.: RV_OpenItem): não dá pra construir PO
+		// (PO.setKeyInfo exige PK/UU/FK) → lê as linhas direto do ResultSet.
+		int tableId = resolveTableId(request, template);
+		if (tableId > 0 && !(template.getAD_Table_ID() > 0 && template.getAD_Table_ID() != tableId)) {
+			MTable table = MTable.get(template.getCtx(), tableId);
+			String[] keys = table.getKeyColumns();
+			if (keys == null || keys.length == 0) {
+				List<Map<String, Object>> rowMaps = resolveKeylessRows(request, table);
+				if (rowMaps.isEmpty())
+					return null;
+				return new PrintTemplateContentRenderer(template, rowMaps); // keyless = sempre listagem
+			}
+		}
+
 		List<PO> targets = resolveTargetPOs(request, template);
 		if (targets.isEmpty())
 			return null; // sem contexto de registro (ex.: report avulso, Record_ID=0) → declina; o core segue no fluxo normal
@@ -79,14 +102,37 @@ public class PrintTemplateContentRendererFactory implements IReportContentRender
 						"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") };
 
 		private final MPrintTemplate template;
+		/** Caminho keyed (PO). Pode ser null quando keyless. */
 		private final List<PO> targets;
+		/** Caminho keyless (linhas do ResultSet). Pode ser null quando keyed. */
+		private final List<Map<String, Object>> rowMaps;
 		/** IsForm='N': um único render com todos os registros (rows); false = 1 doc por registro + merge */
 		private final boolean listMode;
 
+		/** keyed: 1 doc por registro (documento) ou 1 render com todos (listagem) */
 		private PrintTemplateContentRenderer(MPrintTemplate template, List<PO> targets, boolean listMode) {
 			this.template = template;
 			this.targets = targets;
+			this.rowMaps = null;
 			this.listMode = listMode;
+		}
+
+		/** keyless (view sem PK/UU/FK): sempre listagem, com linhas já montadas */
+		private PrintTemplateContentRenderer(MPrintTemplate template, List<Map<String, Object>> rowMaps) {
+			this.template = template;
+			this.targets = null;
+			this.rowMaps = rowMaps;
+			this.listMode = true;
+		}
+
+		/** Dispatch da renderização de listagem: keyless (maps) ou keyed (POs) */
+		private void renderListTo(File output, String extension) {
+			boolean ok = (rowMaps != null)
+					? TemplateRenderDispatcher.renderListMaps(template, rowMaps, output, extension)
+					: TemplateRenderDispatcher.renderList(template, targets, output, extension);
+			if (!ok)
+				throw new AdempiereException("Print Template: no renderer installed for engine '"
+						+ template.getTemplateEngineType() + "'");
 		}
 
 		@Override
@@ -97,9 +143,7 @@ public class PrintTemplateContentRendererFactory implements IReportContentRender
 					if ("csv".equals(extension) || "xlsx".equals(extension))
 						return exportTabular(extension);
 					File output = Files.createTempFile("print-template-list-", "." + extension).toFile();
-					if (!TemplateRenderDispatcher.renderList(template, targets, output, extension))
-						throw new AdempiereException("Print Template: no renderer installed for engine '"
-								+ template.getTemplateEngineType() + "'");
+					renderListTo(output, extension);
 					return output;
 				}
 				List<File> rendered = new ArrayList<>();
@@ -132,16 +176,14 @@ public class PrintTemplateContentRendererFactory implements IReportContentRender
 
 		@Override
 		public int getRowCount() {
-			return targets.size();
+			return rowMaps != null ? rowMaps.size() : targets.size();
 		}
 
 		/** Renderiza a listagem como HTML, extrai o {@code <table>} e reescreve em CSV/XLSX */
 		private File exportTabular(String extension) throws Exception {
 			File html = Files.createTempFile("print-template-list-", ".html").toFile();
 			try {
-				if (!TemplateRenderDispatcher.renderList(template, targets, html, "html"))
-					throw new AdempiereException("Print Template: no renderer installed for engine '"
-							+ template.getTemplateEngineType() + "'");
+				renderListTo(html, "html");
 				List<List<String>> table = TabularExporter.extractTable(
 						Files.readString(html.toPath(), StandardCharsets.UTF_8));
 				File output = Files.createTempFile("print-template-list-", "." + extension).toFile();
@@ -191,6 +233,69 @@ public class PrintTemplateContentRendererFactory implements IReportContentRender
 				|| (contentType != null && contentType.toLowerCase().contains("spreadsheetml.sheet")))
 			return "xlsx";
 		throw new AdempiereException("Print Template: unsupported output type " + contentType + " (" + fileExtension + ")");
+	}
+
+	/** Resolve a tabela do report: printInfo → processInfo → printFormat → template */
+	private static int resolveTableId(ReportContentRequest request, MPrintTemplate template) {
+		PrintInfo printInfo = request.printInfo();
+		ProcessInfo processInfo = request.processInfo();
+		MPrintFormat printFormat = request.printFormat();
+		int tableId = printInfo != null ? printInfo.getAD_Table_ID() : 0;
+		if (tableId <= 0 && processInfo != null)
+			tableId = processInfo.getTable_ID();
+		if (tableId <= 0 && printFormat != null)
+			tableId = printFormat.getAD_Table_ID();
+		if (tableId <= 0 && template.getAD_Table_ID() > 0)
+			tableId = template.getAD_Table_ID();
+		return tableId;
+	}
+
+	/**
+	 * Lê uma tabela/view KEYLESS direto do ResultSet (sem construir PO) e
+	 * monta as linhas do data model. Respeita o escopo do report (MQuery),
+	 * IsActive e o acesso do papel (MRole.addAccessSQL). Cap MAX_BATCH_ROWS.
+	 */
+	private static List<Map<String, Object>> resolveKeylessRows(ReportContentRequest request, MTable table) {
+		List<Map<String, Object>> rows = new ArrayList<>();
+		Properties ctx = table.getCtx();
+		POInfo info = POInfo.getPOInfo(ctx, table.getAD_Table_ID());
+		if (info == null)
+			return rows;
+		ReportEngine re = request.reportEngine();
+		MQuery mq = (re != null) ? re.getQuery() : null;
+		String mqWhere = (mq != null && mq.getRestrictionCount() > 0) ? mq.getWhereClause(false) : null;
+		if (mqWhere != null && (mqWhere.contains(";") || mqWhere.contains("--")))
+			mqWhere = null; // guard defensivo
+
+		String tableName = table.getTableName();
+		StringBuilder sql = new StringBuilder("SELECT * FROM ").append(tableName).append(" WHERE 1=1");
+		if (info.getColumnIndex("IsActive") >= 0)
+			sql.append(" AND ").append(tableName).append(".IsActive='Y'");
+		if (!Util.isEmpty(mqWhere, true))
+			sql.append(" AND (").append(mqWhere).append(")");
+		String finalSql = MRole.getDefault(ctx, false)
+				.addAccessSQL(sql.toString(), tableName, MRole.SQL_FULLYQUALIFIED, MRole.SQL_RO);
+
+		PreparedStatement pstmt = null;
+		ResultSet rs = null;
+		try {
+			pstmt = DB.prepareStatement(finalSql, null);
+			rs = pstmt.executeQuery();
+			while (rs.next()) {
+				if (rows.size() >= MAX_BATCH_ROWS) {
+					log.warning("Print Template: view " + tableName + " truncada em " + MAX_BATCH_ROWS
+							+ " linhas (filtre o report antes)");
+					break;
+				}
+				rows.add(PO2MapBuilder.buildFlatFromRS(info, rs));
+			}
+		} catch (Exception e) {
+			log.warning("Print Template: não li a view keyless " + tableName + " (" + e.getMessage() + ") — declinando");
+			return new ArrayList<>();
+		} finally {
+			DB.close(rs, pstmt);
+		}
+		return rows;
 	}
 
 	private static List<PO> resolveTargetPOs(ReportContentRequest request, MPrintTemplate template) {

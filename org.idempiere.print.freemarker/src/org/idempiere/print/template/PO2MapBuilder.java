@@ -13,12 +13,17 @@
 **********************************************************************/
 package org.idempiere.print.template;
 
+import java.math.BigDecimal;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.adempiere.exceptions.AdempiereException;
+import org.compiere.model.Lookup;
 import org.compiere.model.MTable;
 import org.compiere.model.PO;
 import org.compiere.model.POInfo;
@@ -86,6 +91,51 @@ public final class PO2MapBuilder {
 			}
 		}
 		return map;
+	}
+
+	/**
+	 * Igual ao {@link #buildFlat(PO)} mas a partir de um {@link ResultSet}
+	 * (linha corrente) — pro caso de VIEW keyless, onde não dá pra construir
+	 * PO ({@code PO.setKeyInfo} exige PK/UU/FK). Tipos via POInfo (Integer/
+	 * BigDecimal/Timestamp/Boolean/String); FK vira {id, display} usando o
+	 * lookup do POInfo (sem instância de PO).
+	 */
+	public static Map<String, Object> buildFlatFromRS(POInfo info, ResultSet rs) throws SQLException {
+		Map<String, Object> map = new LinkedHashMap<>();
+		for (int i = 0; i < info.getColumnCount(); i++) {
+			if (info.isEncrypted(i))
+				continue;
+			String columnName = info.getColumnName(i);
+			int displayType = info.getColumnDisplayType(i);
+			Object value = readValue(rs, columnName, info.getColumnClass(i));
+			if (value instanceof Integer && DisplayType.isLookup(displayType) && !info.isKey(i)) {
+				Map<String, Object> fk = new LinkedHashMap<>();
+				fk.put("id", value);
+				Lookup lookup = info.getColumnLookup(i);
+				fk.put("display", lookup != null ? lookup.getDisplay(value) : String.valueOf(value));
+				map.put(columnName, fk);
+			} else {
+				map.put(columnName, value);
+			}
+		}
+		return map;
+	}
+
+	/** Lê a coluna do ResultSet no tipo Java do POInfo (mesma convenção do PO.load) */
+	private static Object readValue(ResultSet rs, String columnName, Class<?> clazz) throws SQLException {
+		if (clazz == Integer.class) {
+			int v = rs.getInt(columnName);
+			return rs.wasNull() ? null : Integer.valueOf(v);
+		}
+		if (clazz == BigDecimal.class)
+			return rs.getBigDecimal(columnName);
+		if (clazz == Timestamp.class)
+			return rs.getTimestamp(columnName);
+		if (clazz == Boolean.class) {
+			String s = rs.getString(columnName);
+			return s == null ? null : Boolean.valueOf("Y".equals(s));
+		}
+		return rs.getString(columnName);
 	}
 
 	private static List<Map<String, Object>> loadChildren(PO po, MPrintTemplateInclude include) {

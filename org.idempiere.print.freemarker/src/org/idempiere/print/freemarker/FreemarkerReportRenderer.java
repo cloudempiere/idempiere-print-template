@@ -84,25 +84,36 @@ public class FreemarkerReportRenderer implements IReportRenderer<FreemarkerRepor
 		MPrintTemplate printTemplate = config.getTemplate();
 		PO targetPO = config.getPO();
 		List<PO> listPOs = config.getPOs();
+		List<Map<String, Object>> rowMaps = config.getRowMaps();
 		try {
 			Template template = new Template(printTemplate.getName(),
 					printTemplate.getTemplateBody(), FreemarkerConfigurationFactory.get());
 
 			Map<String, Object> dataModel;
-			if (listPOs != null && !listPOs.isEmpty()) {
+			Properties ctx;
+			if (rowMaps != null) {
+				// Modo listagem sobre view KEYLESS: linhas já montadas (sem PO);
+				// ctx sai do template pois não há PO representativo
+				dataModel = new LinkedHashMap<>();
+				dataModel.put("rows", rowMaps);
+				dataModel.put("count", rowMaps.size());
+				ctx = printTemplate.getCtx();
+			} else if (listPOs != null && !listPOs.isEmpty()) {
 				// Modo listagem (IsForm='N'): todos os registros em rows; o
-				// template itera (<#list rows as r>) e agrega (rows?map(..)?sum)
+				// template itera (<#list rows as r>) e agrega na mão
 				List<Map<String, Object>> rows = new ArrayList<>();
 				for (PO po : listPOs)
 					rows.add(PO2MapBuilder.build(po, printTemplate.getIncludes()));
 				dataModel = new LinkedHashMap<>();
 				dataModel.put("rows", rows);
 				dataModel.put("count", rows.size());
+				ctx = config.getPO().getCtx();
 			} else {
 				// Modo documento (IsForm='Y'): colunas do PO no topo
 				dataModel = PO2MapBuilder.build(targetPO, printTemplate.getIncludes());
+				ctx = targetPO.getCtx();
 			}
-			dataModel.put("ctx", contextMap(targetPO.getCtx()));
+			dataModel.put("ctx", contextMap(ctx));
 			dataModel.put("assets", AssetResolver.asBase64(printTemplate));
 
 			if (isPdfOutput(config, printTemplate)) {

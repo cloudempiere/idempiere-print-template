@@ -17,6 +17,7 @@ import java.io.File;
 import java.io.OutputStream;
 import java.io.Writer;
 import java.util.List;
+import java.util.Map;
 
 import org.compiere.model.PO;
 import org.idempiere.print.renderer.IReportRendererConfiguration;
@@ -34,6 +35,8 @@ public class TemplateRendererConfiguration implements IReportRendererConfigurati
 	private final PO targetPO;
 	/** Modo listagem (IsForm='N'): todos os registros num único render; null/vazio = modo documento */
 	private List<PO> targetPOs;
+	/** Modo listagem sobre tabela/view KEYLESS: linhas já montadas (sem PO); tem precedência sobre targetPOs */
+	private List<Map<String, Object>> rowMaps;
 	private File outputFile;
 	private OutputStream outputStream;
 	private Writer outputWriter;
@@ -59,6 +62,16 @@ public class TemplateRendererConfiguration implements IReportRendererConfigurati
 
 	public TemplateRendererConfiguration targetPOs(List<PO> targetPOs) {
 		this.targetPOs = targetPOs;
+		return this;
+	}
+
+	/** Linhas pré-montadas (view keyless); null = usa PO/targetPOs */
+	public List<Map<String, Object>> getRowMaps() {
+		return rowMaps;
+	}
+
+	public TemplateRendererConfiguration rowMaps(List<Map<String, Object>> rowMaps) {
+		this.rowMaps = rowMaps;
 		return this;
 	}
 

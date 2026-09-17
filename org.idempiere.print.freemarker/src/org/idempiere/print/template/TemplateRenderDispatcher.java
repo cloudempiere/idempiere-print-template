@@ -15,6 +15,7 @@ package org.idempiere.print.template;
 
 import java.io.File;
 import java.util.List;
+import java.util.Map;
 
 import org.adempiere.base.Core;
 import org.adempiere.exceptions.AdempiereException;
@@ -95,6 +96,29 @@ public class TemplateRenderDispatcher {
 			return false;
 		TemplateRendererConfiguration config = newConfig(renderer, engineType, template, targetPOs.get(0));
 		config.targetPOs(targetPOs);
+		config.outputFile(outputFile);
+		config.outputFormat(outputFormat);
+		renderer.renderReport(null, config);
+		return true;
+	}
+
+	/**
+	 * Modo listagem sobre tabela/view KEYLESS: as linhas já vêm montadas
+	 * (sem PO, pois {@code PO.setKeyInfo} exige PK/UU/FK). O ctx sai do
+	 * próprio template (não há PO representativo).
+	 *
+	 * @return false quando não há renderer registrado ou a lista é null
+	 */
+	public static boolean renderListMaps(MPrintTemplate template, List<Map<String, Object>> rowMaps,
+			File outputFile, String outputFormat) {
+		if (rowMaps == null)
+			return false;
+		String engineType = template.getTemplateEngineType();
+		IReportRenderer<IReportRendererConfiguration> renderer = getRenderer(engineType);
+		if (renderer == null)
+			return false;
+		TemplateRendererConfiguration config = newConfig(renderer, engineType, template, null);
+		config.rowMaps(rowMaps);
 		config.outputFile(outputFile);
 		config.outputFormat(outputFormat);
 		renderer.renderReport(null, config);
