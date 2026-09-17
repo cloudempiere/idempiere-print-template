@@ -1,2 +1,4 @@
 bin/
 target/
+# Embedded runtime libraries — fetched by maven-dependency-plugin (validate phase) on build
+lib/
