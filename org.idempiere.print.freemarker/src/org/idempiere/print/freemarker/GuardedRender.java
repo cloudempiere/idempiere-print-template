@@ -34,7 +34,9 @@ import org.adempiere.util.ServerContext;
 import org.adempiere.util.ServerContextPropertiesWrapper;
 import org.compiere.model.MSysConfig;
 import org.compiere.util.CLogger;
+import org.compiere.util.Language;
 
+import freemarker.core.Environment;
 import freemarker.core._CoreAPI;
 import freemarker.template.Template;
 import freemarker.template.TemplateException;
@@ -185,8 +187,20 @@ public final class GuardedRender {
 	 */
 	public static void process(Template template, Object dataModel, Writer out, int adClientId, Properties ctx)
 			throws TemplateException, IOException {
+		process(template, dataModel, out, adClientId, ctx, null);
+	}
+
+	/**
+	 * Same as {@link #process(Template, Object, Writer, int, Properties)} in a document language: the
+	 * render's locale and default date formats follow it
+	 * ({@link FreemarkerConfigurationFactory#applyLanguage}).
+	 *
+	 * @param language document language; null keeps the configuration's locale and formats
+	 */
+	public static void process(Template template, Object dataModel, Writer out, int adClientId, Properties ctx,
+			Language language) throws TemplateException, IOException {
 		if (!(template.getConfiguration() instanceof FreemarkerConfigurationFactory.StrictConfiguration)) {
-			template.process(dataModel, out);
+			run(template, dataModel, out, adClientId, language);
 			return;
 		}
 		int maxKb = limit(SYSCONFIG_MAX_OUTPUT_KB, DEFAULT_MAX_OUTPUT_KB, adClientId);
@@ -228,7 +242,7 @@ public final class GuardedRender {
 					return null;
 				ServerContext.setCurrentInstance(workerCtx);
 				try {
-					template.process(dataModel, capped);
+					run(template, dataModel, capped, adClientId, language);
 					return null;
 				} finally {
 					ServerContext.dispose();
@@ -255,6 +269,14 @@ public final class GuardedRender {
 		} catch (ExecutionException e) {
 			throw unwrap(e.getCause());
 		}
+	}
+
+	/** One render: the environment of the template, in the document language when there is one. */
+	private static void run(Template template, Object dataModel, Writer out, int adClientId, Language language)
+			throws TemplateException, IOException {
+		Environment env = template.createProcessingEnvironment(dataModel, out);
+		FreemarkerConfigurationFactory.applyLanguage(env, language, adClientId);
+		env.process();
 	}
 
 	/** Stops a render the caller gives up on; frees the permit only if the task never started. */

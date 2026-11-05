@@ -34,6 +34,7 @@ import org.compiere.print.ReportEngine;
 import org.compiere.process.ProcessInfo;
 import org.compiere.util.CLogger;
 import org.compiere.util.DB;
+import org.compiere.util.Language;
 import org.compiere.util.Util;
 import org.idempiere.print.IReportContentRenderer;
 import org.idempiere.print.IReportContentRendererFactory;
@@ -66,6 +67,9 @@ public class PrintTemplateContentRendererFactory implements IReportContentRender
 		Properties ctx = request.reportEngine().getCtx() != null ? request.reportEngine().getCtx()
 				: printFormat.getCtx();
 		MPrintTemplate template = MPrintTemplate.get(ctx, templateId);
+		// document language as core resolved it: ReportEngine.get sets the business partner's language
+		// on the print format when the client prints multi-lingual documents
+		Language language = printFormat.getLanguage();
 		if (template == null || !template.isActive())
 			throw new AdempiereException("Print Template: template " + templateId + " does not exist or is inactive");
 
@@ -76,10 +80,10 @@ public class PrintTemplateContentRendererFactory implements IReportContentRender
 			MTable table = MTable.get(ctx, tableId);
 			String[] keys = table.getKeyColumns();
 			if (keys == null || keys.length == 0) {
-				List<Map<String, Object>> rowMaps = resolveKeylessRows(ctx, request, table);
+				List<Map<String, Object>> rowMaps = resolveKeylessRows(ctx, request, table, language);
 				if (rowMaps.isEmpty())
 					return null;
-				return new PrintTemplateContentRenderer(template, rowMaps); // keyless = sempre listagem
+				return new PrintTemplateContentRenderer(template, rowMaps, language); // keyless = sempre listagem
 			}
 		}
 
@@ -88,7 +92,7 @@ public class PrintTemplateContentRendererFactory implements IReportContentRender
 			return null; // sem contexto de registro (ex.: report avulso, Record_ID=0) → declina; o core segue no fluxo normal
 		// IsForm='Y' → documento (1 render por registro + merge); IsForm='N' → listagem (1 render, rows = todos)
 		boolean listMode = !printFormat.isForm();
-		return new PrintTemplateContentRenderer(template, targets, listMode);
+		return new PrintTemplateContentRenderer(template, targets, listMode, language);
 	}
 
 	private static final class PrintTemplateContentRenderer implements IReportContentRenderer {
@@ -111,28 +115,34 @@ public class PrintTemplateContentRendererFactory implements IReportContentRender
 		private final List<Map<String, Object>> rowMaps;
 		/** IsForm='N': um único render com todos os registros (rows); false = 1 doc por registro + merge */
 		private final boolean listMode;
+		/** document language of the print format; null = the language of the request's context */
+		private final Language language;
 
 		/** keyed: 1 doc por registro (documento) ou 1 render com todos (listagem) */
-		private PrintTemplateContentRenderer(MPrintTemplate template, List<PO> targets, boolean listMode) {
+		private PrintTemplateContentRenderer(MPrintTemplate template, List<PO> targets, boolean listMode,
+				Language language) {
 			this.template = template;
 			this.targets = targets;
 			this.rowMaps = null;
 			this.listMode = listMode;
+			this.language = language;
 		}
 
 		/** keyless (view sem PK/UU/FK): sempre listagem, com linhas já montadas */
-		private PrintTemplateContentRenderer(MPrintTemplate template, List<Map<String, Object>> rowMaps) {
+		private PrintTemplateContentRenderer(MPrintTemplate template, List<Map<String, Object>> rowMaps,
+				Language language) {
 			this.template = template;
 			this.targets = null;
 			this.rowMaps = rowMaps;
 			this.listMode = true;
+			this.language = language;
 		}
 
 		/** Dispatch da renderização de listagem: keyless (maps) ou keyed (POs) */
 		private void renderListTo(File output, String extension) {
 			boolean ok = (rowMaps != null)
-					? TemplateRenderDispatcher.renderListMaps(template, rowMaps, output, extension)
-					: TemplateRenderDispatcher.renderList(template, targets, output, extension);
+					? TemplateRenderDispatcher.renderListMaps(template, rowMaps, output, extension, language)
+					: TemplateRenderDispatcher.renderList(template, targets, output, extension, language);
 			if (!ok)
 				throw new AdempiereException("Print Template: no renderer installed for engine '"
 						+ template.getTemplateEngineType() + "'");
@@ -152,7 +162,7 @@ public class PrintTemplateContentRendererFactory implements IReportContentRender
 				List<File> rendered = new ArrayList<>();
 				for (PO target : targets) {
 					File output = Files.createTempFile("print-template-" + target.get_ID() + "-", "." + extension).toFile();
-					if (!TemplateRenderDispatcher.render(template, target, output, extension))
+					if (!TemplateRenderDispatcher.render(template, target, output, extension, language))
 						throw new AdempiereException("Print Template: no renderer installed for engine '"
 								+ template.getTemplateEngineType() + "'");
 					rendered.add(output);
@@ -259,7 +269,8 @@ public class PrintTemplateContentRendererFactory implements IReportContentRender
 	 * IsActive e o acesso do papel (MRole.addAccessSQL). Cap MAX_BATCH_ROWS.
 	 */
 	private static List<Map<String, Object>> resolveKeylessRows(Properties ctx, ReportContentRequest request,
-			MTable table) {
+			MTable table, Language language) {
+		PO2MapBuilder.DisplayLanguage display = language == null ? null : new PO2MapBuilder.DisplayLanguage(language);
 		List<Map<String, Object>> rows = new ArrayList<>();
 		// without a role addAccessSQL cannot filter: fail closed
 		MRole role = PO2MapBuilder.requireRole(ctx, table.getTableName());
@@ -273,7 +284,16 @@ public class PrintTemplateContentRendererFactory implements IReportContentRender
 			mqWhere = null; // guard defensivo
 
 		String tableName = table.getTableName();
-		StringBuilder sql = new StringBuilder("SELECT * FROM ").append(tableName).append(" WHERE 1=1");
+		// a view X_v in a language other than the base language: its translation view X_vt in that language,
+		// as a print format reads it; the view keeps the name of the table, so the report's restriction and
+		// the role's access SQL read as they do on X_v
+		String view = display == null ? null : display.translationView(tableName);
+		StringBuilder sql = new StringBuilder("SELECT * FROM ");
+		if (view != null)
+			sql.append(view).append(" ");
+		sql.append(tableName).append(" WHERE 1=1");
+		if (view != null)
+			sql.append(" AND ").append(tableName).append(".AD_Language=?");
 		if (info.getColumnIndex("IsActive") >= 0)
 			sql.append(" AND ").append(tableName).append(".IsActive='Y'");
 		if (!Util.isEmpty(mqWhere, true))
@@ -285,6 +305,8 @@ public class PrintTemplateContentRendererFactory implements IReportContentRender
 		ResultSet rs = null;
 		try {
 			pstmt = DB.prepareStatement(finalSql, null);
+			if (view != null)
+				pstmt.setString(1, language.getAD_Language());
 			rs = pstmt.executeQuery();
 			while (rs.next()) {
 				if (rows.size() >= MAX_BATCH_ROWS) {
@@ -292,7 +314,7 @@ public class PrintTemplateContentRendererFactory implements IReportContentRender
 							+ " linhas (filtre o report antes)");
 					break;
 				}
-				rows.add(PO2MapBuilder.buildFlatFromRS(info, rs));
+				rows.add(PO2MapBuilder.buildFlatFromRS(ctx, info, rs, display));
 			}
 		} catch (Exception e) {
 			log.warning("Print Template: não li a view keyless " + tableName + " (" + e.getMessage() + ") — declinando");
