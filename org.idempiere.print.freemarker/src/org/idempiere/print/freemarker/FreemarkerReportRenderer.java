@@ -31,6 +31,7 @@ import org.compiere.model.MOrg;
 import org.compiere.model.PO;
 import org.compiere.print.ReportEngine;
 import org.compiere.util.Env;
+import org.compiere.util.Language;
 import org.idempiere.print.renderer.IReportRenderer;
 import org.idempiere.print.template.HtmlToPdfConverter;
 import org.idempiere.print.template.PO2MapBuilder;
@@ -45,7 +46,13 @@ import freemarker.template.Template;
  *
  * Data model: colunas do PO (FK como {id, display}) + coleções dos
  * includes + namespace {@code ctx} (client/org/user/idioma/now) +
- * {@code assets} (anexos do template em base64).
+ * {@code assets} (anexos do template em base64) + {@code msg} (texts of the dictionary,
+ * {@link TranslateMethod}).
+ * <p>
+ * Document language: the print format's language when the request carries one (core sets the business
+ * partner's language there for multi-lingual documents), else the language of the request's context.
+ * It decides {@code ctx.language}, {@code msg}, the {@code display} of foreign keys, the locale and the
+ * default date formats of the render; {@code ctx.login_language} keeps the language of the user printing.
  */
 public class FreemarkerReportRenderer implements IReportRenderer<FreemarkerReportRendererConfiguration> {
 
@@ -92,6 +99,8 @@ public class FreemarkerReportRenderer implements IReportRenderer<FreemarkerRepor
 			// document and list mode: the configuration (templates, includes, limits) is that of the
 			// record's client; keyless mode has no record and keeps the request's client
 			int adClientId = resolveConfigurationClient(ctx, config);
+			Language language = resolveLanguage(ctx, config);
+			PO2MapBuilder.DisplayLanguage display = new PO2MapBuilder.DisplayLanguage(language);
 			Template template = new Template(printTemplate.getName(),
 					printTemplate.getTemplateBody(),
 					FreemarkerConfigurationFactory.get(adClientId));
@@ -107,22 +116,23 @@ public class FreemarkerReportRenderer implements IReportRenderer<FreemarkerRepor
 				// template itera (<#list rows as r>) e agrega na mão
 				List<Map<String, Object>> rows = new ArrayList<>();
 				for (PO po : listPOs)
-					rows.add(PO2MapBuilder.build(po, printTemplate.getIncludes()));
+					rows.add(PO2MapBuilder.build(po, printTemplate.getIncludes(), display));
 				dataModel = new LinkedHashMap<>();
 				dataModel.put("rows", rows);
 				dataModel.put("count", rows.size());
 			} else {
 				// Modo documento (IsForm='Y'): colunas do PO no topo
-				dataModel = PO2MapBuilder.build(targetPO, printTemplate.getIncludes());
+				dataModel = PO2MapBuilder.build(targetPO, printTemplate.getIncludes(), display);
 			}
-			dataModel.put("ctx", contextMap(ctx));
+			dataModel.put("ctx", contextMap(ctx, language));
+			dataModel.put("msg", new TranslateMethod(language.getAD_Language(), isSOTrx(config)));
 			dataModel.put("assets", AssetResolver.asBase64(ctx, printTemplate));
 
 			if (isPdfOutput(config, printTemplate)) {
 				// Fase 4: FreeMarker → HTML em memória → openhtmltopdf (@page CSS
 				// controla tamanho/margens; jsoup tolera HTML não-XHTML)
 				StringWriter html = new StringWriter();
-				GuardedRender.process(template, dataModel, html, adClientId, ctx);
+				GuardedRender.process(template, dataModel, html, adClientId, ctx, language);
 				if (config.getOutputStream() != null) {
 					// the caller's stream is flushed, not closed
 					HtmlToPdfConverter.convert(html.toString(), config.getOutputStream());
@@ -138,12 +148,12 @@ public class FreemarkerReportRenderer implements IReportRenderer<FreemarkerRepor
 					// a writer the renderer opens on a file is its own to close
 					try (Writer writer = new OutputStreamWriter(
 							new FileOutputStream(config.getOutputFile(), false), printTemplate.getTemplateEncoding())) {
-						GuardedRender.process(template, dataModel, writer, adClientId, ctx);
+						GuardedRender.process(template, dataModel, writer, adClientId, ctx, language);
 					}
 				} else {
 					// a writer or stream of the caller is flushed, not closed
 					Writer writer = resolveWriter(config, printTemplate.getTemplateEncoding());
-					GuardedRender.process(template, dataModel, writer, adClientId, ctx);
+					GuardedRender.process(template, dataModel, writer, adClientId, ctx, language);
 					writer.flush();
 				}
 			}
@@ -187,6 +197,28 @@ public class FreemarkerReportRenderer implements IReportRenderer<FreemarkerRepor
 		return Env.getAD_Client_ID(requestCtx);
 	}
 
+	/**
+	 * Document language: the configuration's (the print format's language), else the language of the
+	 * request's context.
+	 */
+	static Language resolveLanguage(Properties requestCtx, FreemarkerReportRendererConfiguration config) {
+		Language language = config.getLanguage();
+		return language != null ? language : Env.getLanguage(requestCtx);
+	}
+
+	/**
+	 * Sales terminology for {@code msg}: the record's IsSOTrx (document mode, or the first record of a
+	 * list), else sales.
+	 */
+	static boolean isSOTrx(FreemarkerReportRendererConfiguration config) {
+		PO po = config.getPO();
+		if (po == null && config.getPOs() != null && !config.getPOs().isEmpty())
+			po = config.getPOs().get(0);
+		if (po != null && po.get_ColumnIndex("IsSOTrx") >= 0)
+			return po.get_ValueAsBoolean("IsSOTrx");
+		return true;
+	}
+
 	private boolean isPdfOutput(FreemarkerReportRendererConfiguration config, MPrintTemplate template) {
 		if (config.getOutputFormat() != null)
 			return "pdf".equalsIgnoreCase(config.getOutputFormat());
@@ -213,14 +245,15 @@ public class FreemarkerReportRenderer implements IReportRenderer<FreemarkerRepor
 		throw new AdempiereException("Nenhum output configurado (writer/stream/file)");
 	}
 
-	private Map<String, Object> contextMap(Properties ctx) {
+	private Map<String, Object> contextMap(Properties ctx, Language language) {
 		Map<String, Object> map = new LinkedHashMap<>();
 		int orgId = Env.getAD_Org_ID(ctx);
 		map.put("AD_Client_ID", Env.getAD_Client_ID(ctx));
 		map.put("AD_Org_ID", orgId);
 		map.put("AD_User_ID", Env.getAD_User_ID(ctx));
 		map.put("AD_Role_ID", Env.getAD_Role_ID(ctx));
-		map.put("language", Env.getLanguage(ctx).getAD_Language());
+		map.put("language", language.getAD_Language());
+		map.put("login_language", Env.getLanguage(ctx).getAD_Language());
 		map.put("client_name", MClient.get(ctx).getName());
 		map.put("org_name", orgId > 0 ? MOrg.get(orgId).getName() : "*");
 		map.put("date", Env.getContextAsDate(ctx, "#Date"));

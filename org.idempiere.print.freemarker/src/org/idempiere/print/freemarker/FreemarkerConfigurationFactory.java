@@ -17,11 +17,16 @@ import java.io.IOException;
 import java.util.Locale;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.compiere.model.MLanguage;
 import org.compiere.model.MSysConfig;
+import org.compiere.util.DisplayType;
+import org.compiere.util.Env;
+import org.compiere.util.Language;
 
 import freemarker.cache.ClassTemplateLoader;
 import freemarker.cache.MultiTemplateLoader;
 import freemarker.cache.TemplateLoader;
+import freemarker.core.Environment;
 import freemarker.core.HTMLOutputFormat;
 import freemarker.core.TemplateClassResolver;
 import freemarker.template.Configuration;
@@ -100,6 +105,55 @@ public final class FreemarkerConfigurationFactory {
 			}
 			return template;
 		}
+	}
+
+	/**
+	 * Locale and default date formats of one render, from the document language. The configuration is
+	 * shared by every render of a client, so the language is set on the render's {@link Environment},
+	 * never on the configuration.
+	 * <ul>
+	 * <li>the locale decides decimal and grouping separators, month and day names, also in explicit
+	 * patterns such as {@code ?string[",##0.00"]};</li>
+	 * <li>the default date, time and date-time patterns are those a print format uses
+	 * ({@link DisplayType#getDateFormat(int, Language)}: {@code AD_Language.DatePattern} /
+	 * {@code TimePattern}, else the language's formats), unless the client (or the System) set
+	 * {@code PRT_FREEMARKER_DATE_FORMAT} / {@code _TIME_FORMAT} / {@code _DATETIME_FORMAT}: an explicit
+	 * SysConfig pattern stays;</li>
+	 * <li>the default number pattern stays {@code PRT_FREEMARKER_NUMBER_FORMAT}; its separators follow
+	 * the locale.</li>
+	 * </ul>
+	 *
+	 * @param env the render's environment, before {@link Environment#process()}
+	 * @param language document language; null leaves the configuration's locale and formats
+	 * @param adClientId client whose SysConfig formats apply
+	 */
+	public static void applyLanguage(Environment env, Language language, int adClientId) {
+		if (language == null)
+			return;
+		env.setLocale(language.getLocale());
+		if (MSysConfig.getValue(SYSCONFIG_DATE_FORMAT, null, adClientId) == null)
+			env.setDateFormat(printFormatPattern(DisplayType.Date, language));
+		if (MSysConfig.getValue(SYSCONFIG_TIME_FORMAT, null, adClientId) == null)
+			env.setTimeFormat(printFormatPattern(DisplayType.Time, language));
+		if (MSysConfig.getValue(SYSCONFIG_DATETIME_FORMAT, null, adClientId) == null)
+			env.setDateTimeFormat(printFormatPattern(DisplayType.DateTime, language));
+	}
+
+	/**
+	 * The pattern a print format uses for a date display type in a language. Core reads the language's
+	 * AD_Language record for its patterns and fails without one; a language that has no record (only a
+	 * locale) gets the language's own formats.
+	 *
+	 * @param displayType {@link DisplayType#Date}, {@link DisplayType#Time} or {@link DisplayType#DateTime}
+	 */
+	public static String printFormatPattern(int displayType, Language language) {
+		if (MLanguage.get(Env.getCtx(), language.getAD_Language()) != null)
+			return DisplayType.getDateFormat(displayType, language).toPattern();
+		if (displayType == DisplayType.Time)
+			return language.getTimeFormat().toPattern();
+		if (displayType == DisplayType.DateTime)
+			return language.getDateTimeFormat().toPattern();
+		return language.getDateFormat().toPattern();
 	}
 
 	private static Configuration build(int adClientId) {
