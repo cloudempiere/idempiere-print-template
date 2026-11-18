@@ -111,4 +111,10 @@ Report-content integration (IDEMPIERE-7070) was contributed by
 This fork extends that work with multi-record documents, list/report mode
 and CSV/XLSX export.
 
-License: GPL-2.0.
+## License
+
+Licensed under the **GNU General Public License v2.0 or later**
+(`GPL-2.0-or-later`), matching iDempiere core — see [LICENSE.md](LICENSE.md).
+The per-file source headers grant the "or later" option. The example
+templates under `org.idempiere.print.freemarker/examples/` are covered by
+the same license and may be adapted under its terms.
