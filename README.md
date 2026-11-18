@@ -86,6 +86,24 @@ Requires iDempiere 14 / Java 17. Import `org.idempiere.print.freemarker`
 as an Eclipse PDE project, or build headless with `mvn -U verify` (embedded
 runtime libraries are fetched by Maven — `lib/` is not committed).
 
+## Tests
+
+`org.idempiere.print.freemarker.test` is a fragment of the bundle with integration tests (`@Tag("integration")`):
+sandbox, limits, tenant and role filters, include SQL, fallback to core rendering, document language. They
+start an iDempiere runtime from the core p2 repository and need a GardenWorld database, so they do not run
+by default. From the repository root:
+
+```bash
+mvn verify -DskipTests=false -Dtest.groups=integration -Dtest.excludedGroups=e2e,slow \
+  -Didempiere.core.repository.url=file:///path/to/idempiere/org.idempiere.p2/target/repository \
+  -Didempiere.home=/path/to/idempiere-home
+```
+
+`idempiere.home` is the `IDEMPIERE_HOME` of the test JVM: a directory with `idempiere.properties` (the
+database connection), `idempiereEnv.properties` and `utils/`. The tests use the test transaction; templates
+and SysConfig rows they create are removed again. Tests on translated texts take their languages from the
+database and skip themselves when it has no translation.
+
 ## Credits
 
 Report-content integration (IDEMPIERE-7070) was contributed by
